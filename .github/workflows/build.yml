@@ -25,16 +25,8 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew assembleDebug
 
-    - name: Build Release APK
-      run: ./gradlew assembleRelease
-      env:
-        KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
-        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-    - name: Upload APKs
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: schedule-apk
-        path: app/build/outputs/apk/**/*.apk
+        name: schedule-apk-debug
+        path: app/build/outputs/apk/debug/**/*.apk
