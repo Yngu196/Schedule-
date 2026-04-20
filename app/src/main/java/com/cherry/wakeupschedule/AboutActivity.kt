@@ -8,6 +8,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.cherry.wakeupschedule.BuildConfig
 
 class AboutActivity : AppCompatActivity() {
 
@@ -21,7 +22,7 @@ class AboutActivity : AppCompatActivity() {
         val llLicense = findViewById<LinearLayout>(R.id.ll_license)
         val llUpdateAdapter = findViewById<LinearLayout>(R.id.ll_update_adapter)
 
-        tvVersion.text = "版本: 1.6.3"
+        tvVersion.text = "版本: ${BuildConfig.VERSION_NAME}"
 
         btnBack.setOnClickListener {
             finish()

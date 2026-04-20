@@ -73,8 +73,6 @@ Thumbs.db
 # Local app-specific files
 app/src/main/res/drawable/home.jpg
 app/src/main/res/drawable/图标.png
-*.png
-*.jpg
 
 # IDE
 .trae/

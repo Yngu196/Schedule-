@@ -276,7 +276,19 @@ class WebViewActivity : AppCompatActivity() {
                 Log.d("WebViewActivity", "捕获到下载请求: $url")
                 Log.d("WebViewActivity", "Content-Disposition: $contentDisposition")
                 Log.d("WebViewActivity", "MIME类型: $mimeType")
-                
+
+                // 如果是 APK 文件，让系统浏览器处理
+                if (url.contains(".apk", ignoreCase = true)) {
+                    Log.d("WebViewActivity", "检测到 APK 下载，跳过并使用系统浏览器")
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(this@WebViewActivity, "无法打开下载页面", Toast.LENGTH_SHORT).show()
+                    }
+                    return@setDownloadListener
+                }
+
                 // 在主线程获取当前URL，然后启动下载
                 val currentUrl = this.url
                 downloadWithOkHttp(url, contentDisposition, mimeType, userAgent, currentUrl)

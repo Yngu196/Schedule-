@@ -26,8 +26,9 @@ class UpdateService(private val context: Context) {
     companion object {
         private const val TAG = "UpdateService"
         private const val GITHUB_API_URL = "https://api.github.com/repos/Yngu196/Schedule/releases/latest"
-        private const val CURRENT_VERSION = "1.6.3"
     }
+
+    private val currentVersion: String = com.cherry.wakeupschedule.BuildConfig.VERSION_NAME
 
     private var latestVersion: String = ""
     private var downloadUrl: String = ""
@@ -78,7 +79,7 @@ class UpdateService(private val context: Context) {
                         if (isNewVersion(latestVer)) {
                             showUpdateDialog(latestVer, latestUrl, notes)
                         } else {
-                            if (showNoUpdateToast) showToast("当前已是最新版本 ($CURRENT_VERSION)")
+                            if (showNoUpdateToast) showToast("当前已是最新版本 ($currentVersion)")
                         }
                     } else {
                         if (showNoUpdateToast) showToast("检查更新失败，请稍后重试")
@@ -110,8 +111,26 @@ class UpdateService(private val context: Context) {
                 reader.close()
                 val json = JSONObject(response)
                 latestVersion = json.optString("tag_name", "").removePrefix("v")
-                downloadUrl = json.optString("html_url", "")
                 releaseNotes = json.optString("body", "").take(500)
+
+                // 从 assets 中获取直接的 APK 下载链接
+                val assets = json.optJSONArray("assets")
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val asset = assets.getJSONObject(i)
+                        val name = asset.optString("name", "")
+                        if (name.endsWith(".apk")) {
+                            downloadUrl = asset.optString("browser_download_url", "")
+                            break
+                        }
+                    }
+                }
+
+                // 如果没有找到 APK asset，使用 release 页面的 URL
+                if (downloadUrl.isEmpty()) {
+                    downloadUrl = json.optString("html_url", "")
+                }
+
                 if (latestVersion.isNotEmpty() && downloadUrl.isNotEmpty()) {
                     Quartet(true, latestVersion, downloadUrl, releaseNotes)
                 } else Quartet(false, "", "", "")
@@ -127,7 +146,7 @@ class UpdateService(private val context: Context) {
     // 比较版本号
     private fun isNewVersion(serverVersion: String): Boolean {
         if (serverVersion.isEmpty()) return false
-        val currentParts = CURRENT_VERSION.split(".").map { it.toIntOrNull() ?: 0 }
+        val currentParts = currentVersion.split(".").map { it.toIntOrNull() ?: 0 }
         val serverParts = serverVersion.split(".").map { it.toIntOrNull() ?: 0 }
         for (i in 0 until maxOf(currentParts.size, serverParts.size)) {
             val current = currentParts.getOrElse(i) { 0 }
@@ -141,7 +160,7 @@ class UpdateService(private val context: Context) {
     // 显示更新对话框
     private fun showUpdateDialog(version: String, url: String, notes: String) {
         val message = buildString {
-            append("发现新版本: $version\n当前版本: $CURRENT_VERSION\n\n")
+            append("发现新版本: $version\n当前版本: $currentVersion\n\n")
             if (notes.isNotEmpty()) append("更新说明:\n${notes.take(200)}...")
         }
         AlertDialog.Builder(context)
@@ -154,15 +173,16 @@ class UpdateService(private val context: Context) {
 
     private fun openDownloadPage(downloadUrl: String) {
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (intent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(intent)
-            } else {
-                showToast("无法打开链接，请手动访问:\n$downloadUrl")
+            // 使用内置 WebViewActivity 打开下载页面
+            // WebViewActivity 会检测 APK 文件并使用系统浏览器处理
+            val intent = Intent(context, WebViewActivity::class.java).apply {
+                putExtra("url", downloadUrl)
+                putExtra("title", "下载更新")
             }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
         } catch (e: Exception) {
-            showToast("无法打开链接:\n$downloadUrl")
+            showToast("无法打开下载页面")
         }
     }
 

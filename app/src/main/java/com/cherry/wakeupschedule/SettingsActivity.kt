@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.cherry.wakeupschedule.BuildConfig
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
@@ -892,7 +893,7 @@ class SettingsActivity : AppCompatActivity() {
         val message = """
             课表
 
-            版本: 1.6.3
+            版本: ${BuildConfig.VERSION_NAME}
 
             功能: 自行摸索
 
