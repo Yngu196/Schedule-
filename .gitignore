@@ -70,10 +70,6 @@ lint/tmp/
 ehthumbs.db
 Thumbs.db
 
-# Local app-specific files
-app/src/main/res/drawable/home.jpg
-app/src/main/res/drawable/图标.png
-
 # IDE
 .trae/
 git/
