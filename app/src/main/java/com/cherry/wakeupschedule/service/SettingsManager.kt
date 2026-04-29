@@ -38,8 +38,9 @@ class SettingsManager(context: Context) {
         private const val KEY_VIEW_MODE = "view_mode"                          // 视图模式（周视图/日视图）
         private const val KEY_CUSTOM_SEMESTERS = "custom_semesters"            // 自定义学期列表
         private const val KEY_LAST_UPDATE_CHECK = "last_update_check"        // 上次检查更新日期
+        private const val KEY_COURSE_COLOR_THEME = "course_color_theme"     // 卡片配色主题索引
+        private const val KEY_BACKGROUND_THEME = "background_theme"         // 背景主题索引
 
-        // 默认值
         private const val DEFAULT_SEMESTER = "2024-2025学年 第一学期"
         private const val DEFAULT_WEEK = 1                                     // 默认第1周
         private const val DEFAULT_ALARM_MINUTES = 15                           // 默认提前15分钟
@@ -52,6 +53,7 @@ class SettingsManager(context: Context) {
         private const val DEFAULT_COURSE_CARD_ALPHA = 0.85f                    // 默认卡片透明度85%
         private const val DEFAULT_SHOW_NON_CURRENT_WEEK_COURSES = true         // 默认显示非本周课程
         private const val DEFAULT_NON_CURRENT_WEEK_ALPHA = 0.3f                // 非本周课程默认30%透明度
+        private const val DEFAULT_COLOR_THEME = 0                               // 默认清新马卡龙
     }
 
     // ==================== 学期相关 ====================
@@ -173,18 +175,16 @@ class SettingsManager(context: Context) {
     }
 
     /**
-     * 获取背景类型
-     * @return "default"默认背景，"custom"自定义图片，"solid"纯色背景
+     * 获取背景类型（旧版兼容）
      */
-    fun getBackgroundType(): String {
+    fun getBackgroundTypeString(): String {
         return sharedPreferences.getString(KEY_BACKGROUND_TYPE, DEFAULT_BACKGROUND_TYPE) ?: DEFAULT_BACKGROUND_TYPE
     }
 
     /**
-     * 设置背景类型
-     * @param backgroundType "default"、"custom"或"solid"
+     * 设置背景类型（旧版兼容）
      */
-    fun setBackgroundType(backgroundType: String) {
+    fun setBackgroundTypeString(backgroundType: String) {
         sharedPreferences.edit().putString(KEY_BACKGROUND_TYPE, backgroundType).apply()
     }
 
@@ -436,5 +436,158 @@ class SettingsManager(context: Context) {
     fun markUpdateCheckedToday() {
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
         setLastUpdateCheckDate(today)
+    }
+
+    // ==================== 卡片配色主题相关 ====================
+
+    data class ColorTheme(val name: String, val colors: IntArray, val textColor: Int, val lightTextColor: Int) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as ColorTheme
+            return name == other.name && colors.contentEquals(other.colors)
+        }
+        override fun hashCode(): Int {
+            var result = name.hashCode()
+            result = 31 * result + colors.contentHashCode()
+            return result
+        }
+    }
+
+    val colorThemes: List<ColorTheme> = listOf(
+        ColorTheme(
+            "清新马卡龙", intArrayOf(
+                0xFFF8BBD0.toInt(), 0xFFFFCCBC.toInt(), 0xFFFFF59D.toInt(),
+                0xFFA5D6A7.toInt(), 0xFF90CAF9.toInt(), 0xFFCE93D8.toInt(),
+                0xFF80CBC4.toInt(), 0xFFBCAAA4.toInt()
+            ), 0xFF333333.toInt(), 0xFFFFFFFF.toInt()
+        ),
+        ColorTheme(
+            "莫兰迪低灰", intArrayOf(
+                0xFFD8C3A5.toInt(), 0xFFE0BEA2.toInt(), 0xFFA8B5A0.toInt(),
+                0xFF8FA3AD.toInt(), 0xFF9D8189.toInt(), 0xFF7D9290.toInt(),
+                0xFFC9ADA7.toInt(), 0xFFB4C7DC.toInt()
+            ), 0xFF2C3E50.toInt(), 0xFF2C3E50.toInt()
+        ),
+        ColorTheme(
+            "校园标准正色", intArrayOf(
+                0xFFE55555.toInt(), 0xFF3478DB.toInt(), 0xFF27AE60.toInt(),
+                0xFF9B59B6.toInt(), 0xFFE67E22.toInt(), 0xFFF1C40F.toInt(),
+                0xFF1ABC9C.toInt(), 0xFF607D8B.toInt()
+            ), 0xFF000000.toInt(), 0xFFFFFFFF.toInt()
+        ),
+        ColorTheme(
+            "冷淡极简高级", intArrayOf(
+                0xFF5C6BC0.toInt(), 0xFF26A69A.toInt(), 0xFF78909C.toInt(),
+                0xFFAB47BC.toInt(), 0xFFEF5350.toInt(), 0xFFFFA726.toInt(),
+                0xFF66BB6A.toInt(), 0xFF8D6E63.toInt()
+            ), 0xFF1A1A1A.toInt(), 0xFFFFFFFF.toInt()
+        ),
+        ColorTheme(
+            "春日治愈温柔", intArrayOf(
+                0xFFFFE6EC.toInt(), 0xFFFFF0E6.toInt(), 0xFFF9F8E6.toInt(),
+                0xFFE6F4EA.toInt(), 0xFFE6F0FF.toInt(), 0xFFF0E6FF.toInt(),
+                0xFFE6F8F5.toInt(), 0xFFF2EBE6.toInt()
+            ), 0xFF444444.toInt(), 0xFF444444.toInt()
+        ),
+        ColorTheme(
+            "暗色模式专属", intArrayOf(
+                0xFFB71C1C.toInt(), 0xFF0D47A1.toInt(), 0xFF1B5E20.toInt(),
+                0xFF4A148C.toInt(), 0xFFE65100.toInt(), 0xFF827717.toInt(),
+                0xFF00695C.toInt(), 0xFF4E342E.toInt()
+            ), 0xFFFFFFFF.toInt(), 0xFFFFFFFF.toInt()
+        )
+    )
+
+    fun getCourseColorThemeIndex(): Int {
+        return sharedPreferences.getInt(KEY_COURSE_COLOR_THEME, DEFAULT_COLOR_THEME)
+    }
+
+    fun setCourseColorThemeIndex(index: Int) {
+        sharedPreferences.edit().putInt(KEY_COURSE_COLOR_THEME, index.coerceIn(0, colorThemes.size - 1)).apply()
+    }
+
+    fun getCurrentColorTheme(): ColorTheme {
+        return colorThemes.getOrElse(getCourseColorThemeIndex()) { colorThemes[0] }
+    }
+
+    fun getCourseColors(): IntArray {
+        return getCurrentColorTheme().colors
+    }
+
+    fun getCourseTextColor(): Int {
+        return getCurrentColorTheme().textColor
+    }
+
+    fun getCourseLightTextColor(): Int {
+        return getCurrentColorTheme().lightTextColor
+    }
+
+    // ==================== 背景主题相关 ====================
+
+    enum class BackgroundType {
+        SOLID,      // 纯色/主题色背景
+        FROSTED,    // 磨砂透明背景
+        IMAGE       // 自定义图片背景
+    }
+
+    data class BackgroundTheme(
+        val name: String,
+        val type: BackgroundType,
+        val color: Int,        // ARGB 颜色值，磨砂透明背景使用包含透明度的 ARGB
+        val isLight: Boolean   // 是否为浅色背景（决定卡片文字颜色）
+    )
+
+    val backgroundThemes: List<BackgroundTheme> = listOf(
+        // ==================== 浅色模式 ====================
+        // 温柔护眼款
+        BackgroundTheme("纯白偏灰", BackgroundType.SOLID, 0xFFF8F9FA.toInt(), true),       // #F8F9FA
+        BackgroundTheme("淡冷奶白", BackgroundType.SOLID, 0xFFF5F7FB.toInt(), true),       // #F5F7FB
+        BackgroundTheme("米杏底色", BackgroundType.SOLID, 0xFFF6F5F1.toInt(), true),       // #F6F5F1
+        // 极简高级款
+        BackgroundTheme("浅雾灰", BackgroundType.SOLID, 0xFFEFF1F5.toInt(), true),         // #EFF1F5
+        BackgroundTheme("社交浅灰", BackgroundType.SOLID, 0xFFF0F2F5.toInt(), true),        // #F0F2F5
+        // 低饱和淡彩底
+        BackgroundTheme("极浅蓝底", BackgroundType.SOLID, 0xFFF5F7FF.toInt(), true),       // #F5F7FF
+        BackgroundTheme("极浅绿底", BackgroundType.SOLID, 0xFFF5FBF7.toInt(), true),       // #F5FBF7
+        BackgroundTheme("极浅粉底", BackgroundType.SOLID, 0xFFFBF5F8.toInt(), true),       // #FBF5F8
+
+        // ==================== 深色模式 ====================
+        BackgroundTheme("暗紫灰", BackgroundType.SOLID, 0xFF1E1E2E.toInt(), false),      // #1E1E2E
+        BackgroundTheme("谷歌深灰", BackgroundType.SOLID, 0xFF202124.toInt(), false),       // #202124
+        BackgroundTheme("藏青暗底", BackgroundType.SOLID, 0xFF2C2C3A.toInt(), false),      // #2C2C3A
+        BackgroundTheme("冷调深空灰", BackgroundType.SOLID, 0xFF1A1D25.toInt(), false),  // #1A1D25
+
+        // ==================== 磨砂透明风 ====================
+        BackgroundTheme("浅透磨砂", BackgroundType.FROSTED, 0xD9F8F9FA.toInt(), true),    // rgba(248,249,250,0.85)
+        BackgroundTheme("深透磨砂", BackgroundType.FROSTED, 0xCC1E1E2E.toInt(), false),   // rgba(30,30,46,0.8)
+    )
+
+    fun getBackgroundThemeIndex(): Int {
+        return sharedPreferences.getInt(KEY_BACKGROUND_THEME, 8)
+    }
+
+    fun setBackgroundThemeIndex(index: Int) {
+        sharedPreferences.edit().putInt(KEY_BACKGROUND_THEME, index.coerceIn(0, backgroundThemes.size - 1)).apply()
+    }
+
+    fun getCurrentBackgroundTheme(): BackgroundTheme {
+        return backgroundThemes.getOrElse(getBackgroundThemeIndex()) { backgroundThemes[0] }
+    }
+
+    fun isBackgroundLight(): Boolean {
+        return getCurrentBackgroundTheme().isLight
+    }
+
+    /**
+     * 获取当前背景模式（图片 vs 颜色主题）
+     * IMAGE: 使用自定义图片（KEY=custom）
+     * SOLID/FROSTED: 使用颜色主题（KEY=default/solid）
+     */
+    fun getBackgroundMode(): BackgroundType {
+        return when (sharedPreferences.getString(KEY_BACKGROUND_TYPE, DEFAULT_BACKGROUND_TYPE)) {
+            "custom" -> BackgroundType.IMAGE
+            else -> getCurrentBackgroundTheme().type
+        }
     }
 }

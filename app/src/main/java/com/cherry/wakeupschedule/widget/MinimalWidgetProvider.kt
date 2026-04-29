@@ -49,12 +49,14 @@ class MinimalWidgetProvider : AppWidgetProvider() {
         updateAllWidgets(context)
         schedulePeriodicUpdate(context)
         WidgetMidnightReceiver.scheduleMidnightUpdate(context)
+        ScheduleWidgetUpdateService.triggerUpdate(context)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         try {
             cancelPeriodicUpdate(context)
+            cancelMinimalCourseEndUpdate(context)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -116,9 +118,13 @@ class MinimalWidgetProvider : AppWidgetProvider() {
                 .mapNotNull { val end = getCourseEndMinutes(context, it); if (end > currentTime) end to it else null }
                 .sortedBy { it.first }
 
-            if (todayEndCourses.isEmpty()) return
+            if (todayEndCourses.isEmpty()) {
+                cancelMinimalCourseEndUpdate(context)
+                return
+            }
             val delayMillis = (todayEndCourses[0].first - currentTime) * 60 * 1000L
             if (delayMillis <= 0) {
+                cancelMinimalCourseEndUpdate(context)
                 triggerWidgetUpdate(context)
                 return
             }
@@ -135,6 +141,21 @@ class MinimalWidgetProvider : AppWidgetProvider() {
             } else {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun cancelMinimalCourseEndUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                WIDGET_MINIMAL_COURSE_END_REQUEST_CODE,
+                Intent(context, WidgetCourseEndReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
         } catch (e: Exception) {
             e.printStackTrace()
         }

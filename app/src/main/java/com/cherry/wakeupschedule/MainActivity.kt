@@ -15,9 +15,16 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import android.view.ViewGroup
+import android.view.animation.OvershootInterpolator
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -56,17 +63,7 @@ class MainActivity : AppCompatActivity() {
 
     private val timeAxisViews = mutableListOf<LinearLayout>()
 
-    // 课程颜色数组
-    private val courseColors = intArrayOf(
-        Color.parseColor("#E53935"), Color.parseColor("#1E88E5"), Color.parseColor("#43A047"),
-        Color.parseColor("#FDD835"), Color.parseColor("#F4511E"), Color.parseColor("#8E24AA"),
-        Color.parseColor("#D81B60"), Color.parseColor("#00ACC1"), Color.parseColor("#FFB300"),
-        Color.parseColor("#5E35B1"), Color.parseColor("#3949AB"), Color.parseColor("#039BE5"),
-        Color.parseColor("#7CB342"), Color.parseColor("#C0CA33"), Color.parseColor("#FB8C00"),
-        Color.parseColor("#AB47BC"), Color.parseColor("#E91E63"), Color.parseColor("#00897B"),
-        Color.parseColor("#5C6BC0"), Color.parseColor("#26A69A"), Color.parseColor("#66BB6A"),
-        Color.parseColor("#6D4C41"), Color.parseColor("#757575"), Color.parseColor("#546E7A")
-    )
+    private fun getCourseColors(): IntArray = settingsManager.getCourseColors()
 
     // 存储所有课程，用于检测冲突
     private var allCourses: List<Course> = emptyList()
@@ -81,6 +78,14 @@ class MainActivity : AppCompatActivity() {
     private var countdownRunnable: Runnable? = null
 
     private var isWeekView = true
+
+    // 拖动相关
+    private var isDragging = false
+    private var dragStartX = 0f
+    private var dragStartY = 0f
+    private var originalX = 0f
+    private var originalY = 0f
+    private val touchSlop = 8f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 在super.onCreate之前应用主题
@@ -255,6 +260,112 @@ class MainActivity : AppCompatActivity() {
         slideOut.start()
     }
 
+    private fun setupDragListener() {
+        val toggleBtn = binding.btnViewToggle
+        val parent = binding.btnViewToggleParent
+
+        toggleBtn.post {
+            originalX = toggleBtn.x
+            originalY = toggleBtn.y
+        }
+
+        toggleBtn.setOnTouchListener { _, event ->
+            val parentWidth = parent.width
+            val parentHeight = parent.height
+            val btnWidth = toggleBtn.width
+            val btnHeight = toggleBtn.height
+            val maxX = parentWidth - btnWidth
+            val maxY = parentHeight - btnHeight
+
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragStartX = event.rawX
+                    dragStartY = event.rawY
+                    isDragging = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - dragStartX
+                    val dy = event.rawY - dragStartY
+
+                    if (!isDragging && (kotlin.math.abs(dx) > touchSlop || kotlin.math.abs(dy) > touchSlop)) {
+                        isDragging = true
+                        animateDragStart(toggleBtn)
+                    }
+
+                    if (isDragging) {
+                        val newX = (originalX + dx).coerceIn(0f, maxX.toFloat())
+                        val newY = (originalY + dy).coerceIn(0f, maxY.toFloat())
+                        toggleBtn.x = newX
+                        toggleBtn.y = newY
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (isDragging) {
+                        isDragging = false
+                        animateDragEnd(toggleBtn, parentWidth, parentHeight, btnWidth, btnHeight)
+                    } else {
+                        toggleBtn.performClick()
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun animateDragStart(view: View) {
+        val scaleX = ObjectAnimator.ofFloat(view, "scaleX", 1f, 0.85f)
+        val scaleY = ObjectAnimator.ofFloat(view, "scaleY", 1f, 0.85f)
+        val alpha = ObjectAnimator.ofFloat(view, "alpha", 1f, 0.7f)
+        val elevation = ObjectAnimator.ofFloat(view, "elevation", 4f, 16f)
+
+        AnimatorSet().apply {
+            playTogether(scaleX, scaleY, alpha, elevation)
+            duration = 120
+            start()
+        }
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private fun animateDragEnd(view: View, parentWidth: Int, parentHeight: Int, btnWidth: Int, btnHeight: Int) {
+        val currentX = view.x
+        val currentY = view.y
+        val centerX = currentX + btnWidth / 2
+        val halfParentWidth = parentWidth / 2
+
+        val snapMargin = (20 * resources.displayMetrics.density).toInt()
+
+        val targetX = if (centerX < halfParentWidth) {
+            snapMargin.toFloat()
+        } else {
+            (parentWidth - btnWidth - snapMargin).toFloat()
+        }
+        val targetY = currentY.coerceIn(0f, (parentHeight - btnHeight).toFloat())
+
+        val animScaleX = ObjectAnimator.ofFloat(view, "scaleX", view.scaleX, 1f)
+        val animScaleY = ObjectAnimator.ofFloat(view, "scaleY", view.scaleY, 1f)
+        val animAlpha = ObjectAnimator.ofFloat(view, "alpha", view.alpha, 1f)
+        val animElevation = ObjectAnimator.ofFloat(view, "elevation", view.elevation, 4f)
+
+        val animX = ObjectAnimator.ofFloat(view, "x", currentX, targetX)
+        val animY = ObjectAnimator.ofFloat(view, "y", currentY, targetY)
+
+        AnimatorSet().apply {
+            playTogether(animScaleX, animScaleY, animAlpha, animElevation, animX, animY)
+            duration = 300
+            interpolator = OvershootInterpolator(1.2f)
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    originalX = targetX
+                    originalY = targetY
+                }
+            })
+            start()
+        }
+    }
+
     private fun updateWeekDisplay() {
         val calendar = Calendar.getInstance()
         val weekText = if (displayWeek == currentWeek) {
@@ -270,6 +381,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnViewToggle.setOnClickListener {
             toggleViewMode()
         }
+        setupDragListener()
         restoreViewMode()
     }
 
@@ -329,8 +441,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createTodayCourseView(course: Course): View {
-        val colorIndex = allCourses.indexOf(course) % courseColors.size
-        val color = courseColors[colorIndex]
+        val colorIndex = allCourses.indexOf(course) % getCourseColors().size
+        val color = getCourseColors()[colorIndex]
 
         val view = LayoutInflater.from(this).inflate(R.layout.item_today_course, null)
         val tvName = view.findViewById<TextView>(R.id.tv_course_name)
@@ -371,10 +483,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyBackgroundSettings() {
-        val backgroundType = settingsManager.getBackgroundType()
-        when (backgroundType) {
-            "custom" -> {
-                // 加载自定义背景
+        when (settingsManager.getBackgroundMode()) {
+            SettingsManager.BackgroundType.IMAGE -> {
                 val customBgPath = settingsManager.getCustomBackgroundPath()
                 if (customBgPath.isNotEmpty() && File(customBgPath).exists()) {
                     try {
@@ -383,30 +493,87 @@ class MainActivity : AppCompatActivity() {
                         binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
                         setTextColorsForCustomBackground()
                     } catch (e: Exception) {
-                        binding.ivBackground.setImageResource(R.drawable.home)
-                        binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
-                        setDefaultTextColors()
+                        applyDefaultBackground()
                     }
                 } else {
-                    binding.ivBackground.setImageResource(R.drawable.home)
-                    binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
-                    setDefaultTextColors()
+                    applyDefaultBackground()
                 }
             }
-            "solid" -> {
-                // 纯色背景
+            SettingsManager.BackgroundType.FROSTED,
+            SettingsManager.BackgroundType.SOLID -> {
                 binding.ivBackground.setImageResource(0)
-                val solidColor = settingsManager.getSolidBackgroundColor()
-                binding.ivBackground.setBackgroundColor(solidColor)
-                setTextColorsForSolidBackground(solidColor)
-            }
-            else -> {
-                // 默认背景
-                binding.ivBackground.setImageResource(R.drawable.home)
-                binding.ivBackground.setBackgroundColor(Color.TRANSPARENT)
-                setDefaultTextColors()
+                val theme = settingsManager.getCurrentBackgroundTheme()
+                binding.ivBackground.setBackgroundColor(theme.color)
+                if (theme.isLight) {
+                    setLightModeTextColors()
+                } else {
+                    setDarkModeTextColors()
+                }
             }
         }
+    }
+
+    private fun applyDefaultBackground() {
+        binding.ivBackground.setImageResource(0)
+        val theme = settingsManager.getCurrentBackgroundTheme()
+        binding.ivBackground.setBackgroundColor(theme.color)
+        if (theme.isLight) {
+            setLightModeTextColors()
+        } else {
+            setDarkModeTextColors()
+        }
+    }
+
+    private fun setDarkModeTextColors() {
+        val textColor = Color.WHITE
+        val subTextColor = Color.parseColor("#CCCCCC")
+
+        binding.tvDate.setTextColor(textColor)
+        binding.tvWeekInfo.setTextColor(subTextColor)
+        binding.btnAdd.setColorFilter(textColor)
+        binding.btnImport.setColorFilter(textColor)
+        binding.btnExport.setColorFilter(textColor)
+        binding.btnMore.setColorFilter(textColor)
+
+        val weekdayViews = listOf(
+            binding.tvWeekday1, binding.tvWeekday2, binding.tvWeekday3,
+            binding.tvWeekday4, binding.tvWeekday5, binding.tvWeekday6, binding.tvWeekday7
+        )
+        weekdayViews.forEach { it.setTextColor(textColor) }
+
+        val dateViews = listOf(
+            binding.tvDate1, binding.tvDate2, binding.tvDate3,
+            binding.tvDate4, binding.tvDate5, binding.tvDate6, binding.tvDate7
+        )
+        dateViews.forEach { it.setTextColor(textColor) }
+
+        updateTimeAxisColors(textColor, subTextColor)
+    }
+
+    private fun setLightModeTextColors() {
+        val textColor = Color.parseColor("#1A1A1A")
+        val subTextColor = Color.parseColor("#555555")
+
+        binding.tvDate.setTextColor(textColor)
+        binding.tvWeekInfo.setTextColor(subTextColor)
+        binding.btnAdd.setColorFilter(textColor)
+        binding.btnImport.setColorFilter(textColor)
+        binding.btnExport.setColorFilter(textColor)
+        binding.btnMore.setColorFilter(textColor)
+
+        val weekdayViews = listOf(
+            binding.tvWeekday1, binding.tvWeekday2, binding.tvWeekday3,
+            binding.tvWeekday4, binding.tvWeekday5, binding.tvWeekday6, binding.tvWeekday7
+        )
+        weekdayViews.forEach { it.setTextColor(textColor) }
+
+        val dateViews = listOf(
+            binding.tvDate1, binding.tvDate2, binding.tvDate3,
+            binding.tvDate4, binding.tvDate5, binding.tvDate6, binding.tvDate7
+        )
+        dateViews.forEach { it.setTextColor(textColor) }
+
+        updateTimeAxisColors(textColor, subTextColor)
     }
 
     private fun setTextColorsForSolidBackground(bgColor: Int) {
@@ -670,6 +837,7 @@ class MainActivity : AppCompatActivity() {
                 binding.layoutEmpty.visibility = View.GONE
                 binding.courseGrid.visibility = View.VISIBLE
                 displayCourses(allCourses)
+                syncTimeAxisHeight()
             }
             if (!isWeekView) {
                 updateTodayView()
@@ -735,6 +903,23 @@ class MainActivity : AppCompatActivity() {
 
             timeAxis.addView(timeView)
             timeAxisViews.add(timeView)
+        }
+    }
+
+    private fun syncTimeAxisHeight() {
+        if (timeAxisViews.isEmpty()) return
+        binding.courseGrid.post {
+            if (timeAxisViews.isEmpty()) return@post
+            val firstCell = binding.courseGrid.getChildAt(0) ?: return@post
+            val actualRowHeight = firstCell.height
+            if (actualRowHeight <= 0) return@post
+            val targetHeight = maxOf(actualRowHeight, (70 * resources.displayMetrics.density).toInt())
+            if (kotlin.math.abs(targetHeight - resources.getDimensionPixelSize(R.dimen.course_cell_height)) < 4) return@post
+            timeAxisViews.forEach { timeView ->
+                val lp = timeView.layoutParams
+                lp.height = targetHeight
+                timeView.layoutParams = lp
+            }
         }
     }
     
@@ -827,7 +1012,7 @@ class MainActivity : AppCompatActivity() {
 
             // 添加课程卡片
             validCourses.forEachIndexed { index, course ->
-                val color = if (course.color != 0) course.color else courseColors[index % courseColors.size]
+                val color = if (course.color != 0) course.color else getCourseColors()[index % getCourseColors().size]
                 val key = Pair(course.dayOfWeek - 1, course.startTime - 1)
                 val conflictCourses = courseGroups[key] ?: listOf()
                 val hasConflict = conflictCourses.size > 1
@@ -1119,6 +1304,7 @@ class MainActivity : AppCompatActivity() {
         allCourses.let {
             if (it.isNotEmpty()) {
                 displayCourses(it)
+                syncTimeAxisHeight()
             }
         }
 
@@ -1330,6 +1516,7 @@ class MainActivity : AppCompatActivity() {
 
         if (isWeekView && allCourses.isNotEmpty()) {
             displayCourses(allCourses)
+            syncTimeAxisHeight()
         }
     }
 

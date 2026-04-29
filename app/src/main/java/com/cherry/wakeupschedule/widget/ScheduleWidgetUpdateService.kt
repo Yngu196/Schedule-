@@ -25,6 +25,13 @@ class ScheduleWidgetUpdateService {
                 provider.onUpdate(context, appWidgetManager, appWidgetIds)
             }
 
+            val minimalComponentName = ComponentName(context, MinimalWidgetProvider::class.java)
+            val minimalAppWidgetIds = appWidgetManager.getAppWidgetIds(minimalComponentName)
+            if (minimalAppWidgetIds.isNotEmpty()) {
+                val minimalProvider = MinimalWidgetProvider()
+                minimalProvider.onUpdate(context, appWidgetManager, minimalAppWidgetIds)
+            }
+
             scheduleNextUpdate(context)
         }
 
@@ -86,6 +93,7 @@ class WidgetBootReceiver : BroadcastReceiver() {
         if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
             context?.let {
                 ScheduleWidgetUpdateService.triggerUpdate(it)
+                MinimalWidgetProvider().schedulePeriodicUpdate(it)
             }
         }
     }
@@ -108,6 +116,7 @@ class WidgetCourseEndReceiver : BroadcastReceiver() {
                     ComponentName(it, MinimalWidgetProvider::class.java)
                 )
             )
+            ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
     }
 }
@@ -123,6 +132,7 @@ class WidgetPeriodicUpdateReceiver : BroadcastReceiver() {
                 )
             )
             ScheduleWidgetProvider().schedulePeriodicUpdate(it)
+            ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
     }
 }
@@ -138,6 +148,7 @@ class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
                 )
             )
             MinimalWidgetProvider().schedulePeriodicUpdate(it)
+            ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
     }
 }

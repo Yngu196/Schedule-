@@ -176,6 +176,19 @@
                     android:background="@drawable/bg_button_outline"
                     android:gravity="start|center_vertical" />
 
+                <!-- 卡片配色 -->
+                <TextView
+                    android:id="@+id/btn_color_theme"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="卡片配色"
+                    android:textSize="15sp"
+                    android:textColor="@android:color/white"
+                    android:padding="12dp"
+                    android:background="@drawable/bg_button_outline"
+                    android:gravity="start|center_vertical"
+                    android:layout_marginTop="8dp" />
+
             </LinearLayout>
 
             <!-- 时间表设置卡片 -->

@@ -29,12 +29,6 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
         private const val WIDGET_COURSE_END_REQUEST_CODE = 10002
         private const val WIDGET_PERIODIC_UPDATE_REQUEST_CODE = 10003
         private const val PERIODIC_UPDATE_INTERVAL = 15 * 60 * 1000L // 15分钟
-        private val courseColors = intArrayOf(
-            Color.parseColor("#E57373"), Color.parseColor("#F06292"), Color.parseColor("#BA68C8"),
-            Color.parseColor("#9575CD"), Color.parseColor("#7986CB"), Color.parseColor("#64B5F6"),
-            Color.parseColor("#4FC3F7"), Color.parseColor("#4DD0E1"), Color.parseColor("#4DB6AC"),
-            Color.parseColor("#81C784"), Color.parseColor("#FFB74D"), Color.parseColor("#FF8A65")
-        )
 
         fun triggerUpdate(context: Context) {
             val intent = Intent(context, ScheduleWidgetProvider::class.java).apply {
@@ -55,12 +49,15 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
         updateAllWidgets(context)
         schedulePeriodicUpdate(context)
         WidgetMidnightReceiver.scheduleMidnightUpdate(context)
+        ScheduleWidgetUpdateService.triggerUpdate(context)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         try {
             cancelPeriodicUpdate(context)
+            cancelCourseEndUpdate(context)
+            ScheduleWidgetUpdateService.cancelScheduledUpdate(context)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -160,15 +157,30 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
                 .mapNotNull { val end = getCourseEndTimeInMinutes(context, it); if (end > currentTime) end to it else null }
                 .sortedBy { it.first }
 
-            if (todayEndCourses.isEmpty()) return
+            if (todayEndCourses.isEmpty()) {
+                cancelCourseEndUpdate(context)
+                return
+            }
             val delayMillis = (todayEndCourses[0].first - currentTime) * 60 * 1000L
-            if (delayMillis <= 0) { triggerWidgetUpdate(context); return }
+            if (delayMillis <= 0) { cancelCourseEndUpdate(context); triggerWidgetUpdate(context); return }
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val pendingIntent = PendingIntent.getBroadcast(context, WIDGET_COURSE_END_REQUEST_CODE, Intent(context, WidgetCourseEndReceiver::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
             else alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun cancelCourseEndUpdate(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val pendingIntent = PendingIntent.getBroadcast(
+                context, WIDGET_COURSE_END_REQUEST_CODE,
+                Intent(context, WidgetCourseEndReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
         } catch (e: Exception) { e.printStackTrace() }
     }
 
@@ -189,7 +201,8 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.tv_course_time_1, if (allTodayCourses.isEmpty()) "" else "明天继续加油！")
             }
             upcomingCourses.size == 1 -> {
-                val course = upcomingCourses[0]; val color = courseColors[(course.id % courseColors.size).toInt()]
+                val course = upcomingCourses[0]
+                val color = SettingsManager(context).getCourseColors()[(course.id % SettingsManager(context).getCourseColors().size).toInt()]
                 views.setViewVisibility(R.id.course_item_1, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_1, "setBackgroundColor", color)
                 views.setTextViewText(R.id.tv_course_name_1, course.name); views.setTextViewText(R.id.tv_course_location_1, course.classroom); views.setTextViewText(R.id.tv_course_time_1, getCourseTimeString(context, course))
                 views.setViewVisibility(R.id.course_item_2, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_2, "setBackgroundColor", Color.parseColor("#CCCCCC"))
@@ -197,9 +210,10 @@ class ScheduleWidgetProvider : AppWidgetProvider() {
             }
             else -> {
                 val (c1, c2) = upcomingCourses[0] to upcomingCourses[1]
-                views.setViewVisibility(R.id.course_item_1, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_1, "setBackgroundColor", courseColors[(c1.id % courseColors.size).toInt()])
+                val colors = SettingsManager(context).getCourseColors()
+                views.setViewVisibility(R.id.course_item_1, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_1, "setBackgroundColor", colors[(c1.id % colors.size).toInt()])
                 views.setTextViewText(R.id.tv_course_name_1, c1.name); views.setTextViewText(R.id.tv_course_location_1, c1.classroom); views.setTextViewText(R.id.tv_course_time_1, getCourseTimeString(context, c1))
-                views.setViewVisibility(R.id.course_item_2, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_2, "setBackgroundColor", courseColors[(c2.id % courseColors.size).toInt()])
+                views.setViewVisibility(R.id.course_item_2, android.view.View.VISIBLE); views.setInt(R.id.course_indicator_2, "setBackgroundColor", colors[(c2.id % colors.size).toInt()])
                 views.setTextViewText(R.id.tv_course_name_2, c2.name); views.setTextViewText(R.id.tv_course_location_2, c2.classroom); views.setTextViewText(R.id.tv_course_time_2, getCourseTimeString(context, c2))
             }
         }

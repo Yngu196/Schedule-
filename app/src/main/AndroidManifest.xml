@@ -47,6 +47,7 @@
         <activity android:name=".IntroActivity" />
         <activity android:name=".AboutActivity" />
         <activity android:name=".CourseOverviewActivity" />
+        <activity android:name=".ColorThemePickerActivity" />
 
         <!-- 闹钟接收器 -->
         <receiver

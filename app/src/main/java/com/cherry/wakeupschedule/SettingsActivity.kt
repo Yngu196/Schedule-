@@ -56,6 +56,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var btnAbout: TextView
     private lateinit var btnTimeTableSettings: TextView
     private lateinit var btnAppearanceSettings: TextView
+    private lateinit var btnColorTheme: TextView
     private lateinit var btnCheckUpdate: TextView
     private lateinit var btnPermissionGuide: TextView
     private lateinit var timeTableManager: TimeTableManager
@@ -149,6 +150,7 @@ class SettingsActivity : AppCompatActivity() {
         btnAbout = findViewById(R.id.btn_about)
         btnTimeTableSettings = findViewById(R.id.btn_time_table_settings)
         btnAppearanceSettings = findViewById(R.id.btn_appearance_settings)
+        btnColorTheme = findViewById(R.id.btn_color_theme)
         btnCheckUpdate = findViewById(R.id.btn_check_update)
         btnPermissionGuide = findViewById(R.id.btn_permission_guide)
 
@@ -209,7 +211,11 @@ class SettingsActivity : AppCompatActivity() {
         btnAppearanceSettings.setOnClickListener {
             showAppearanceSettingsDialog()
         }
-        
+
+        btnColorTheme.setOnClickListener {
+            startActivity(Intent(this, ColorThemePickerActivity::class.java))
+        }
+
         btnAbout.setOnClickListener {
             startActivity(Intent(this, AboutActivity::class.java))
         }
@@ -430,10 +436,9 @@ class SettingsActivity : AppCompatActivity() {
         tvDefaultAlarm.text = "提前${settingsManager.getDefaultAlarmMinutes()}分钟"
 
         // 更新外观设置状态显示
-        val backgroundText = when (settingsManager.getBackgroundType()) {
-            "custom" -> "自定义图片"
-            "solid" -> "纯色背景"
-            else -> "默认背景"
+        val backgroundText = when (settingsManager.getBackgroundMode()) {
+            SettingsManager.BackgroundType.IMAGE -> "图片背景"
+            else -> settingsManager.getCurrentBackgroundTheme().name
         }
 
         btnBackgroundSettings.text = "背景设置 - $backgroundText"
@@ -695,26 +700,32 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun showBackgroundDialog() {
-        val backgrounds = arrayOf("默认背景", "从相册选择图片(可裁剪)", "纯色背景")
+        val options = arrayOf("颜色背景", "图片背景")
 
         AlertDialog.Builder(this)
             .setTitle("选择应用背景")
-            .setItems(backgrounds) { _, which ->
+            .setItems(options) { _, which ->
                 when (which) {
-                    0 -> {
-                        settingsManager.setBackgroundType("default")
-                        settingsManager.setCustomBackgroundPath("")
-                        applyBackgroundSettings()
-                        Toast.makeText(this, "已恢复默认背景", Toast.LENGTH_SHORT).show()
-                    }
-                    1 -> {
-                        // 打开相册选择图片
-                        imagePickerLauncher.launch("image/*")
-                    }
-                    2 -> {
-                        showSolidColorPicker()
-                    }
+                    0 -> showBackgroundThemePicker()
+                    1 -> imagePickerLauncher.launch("image/*")
                 }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showBackgroundThemePicker() {
+        val currentIndex = settingsManager.getBackgroundThemeIndex()
+        val themeNames = settingsManager.backgroundThemes.map { it.name }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("选择背景颜色")
+            .setSingleChoiceItems(themeNames, currentIndex) { dialog, which ->
+                settingsManager.setBackgroundThemeIndex(which)
+                applyBackgroundSettings()
+                updateSettingsDisplay()
+                Toast.makeText(this, "已设置为: ${settingsManager.backgroundThemes[which].name}", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
             }
             .setNegativeButton("取消", null)
             .show()
@@ -735,7 +746,7 @@ class SettingsActivity : AppCompatActivity() {
 
             // 保存路径并设置背景类型
             settingsManager.setCustomBackgroundPath(file.absolutePath)
-            settingsManager.setBackgroundType("custom")
+            settingsManager.setBackgroundThemeIndex(0)
 
             // 显示预览
             showBackgroundPreview(file.absolutePath)
@@ -770,7 +781,7 @@ class SettingsActivity : AppCompatActivity() {
                 // 删除已保存的图片
                 File(imagePath).delete()
                 settingsManager.setCustomBackgroundPath("")
-                settingsManager.setBackgroundType("default")
+                settingsManager.setBackgroundThemeIndex(0)
             }
             .setCancelable(false)
             .show()
@@ -796,7 +807,6 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle("选择背景颜色")
             .setItems(colorNames) { _, which ->
                 settingsManager.setSolidBackgroundColor(colors[which].second)
-                settingsManager.setBackgroundType("solid")
                 applyBackgroundSettings()
                 Toast.makeText(this, "已设置为${colors[which].first}背景", Toast.LENGTH_SHORT).show()
             }
