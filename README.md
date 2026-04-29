@@ -35,8 +35,8 @@
 ### 预览图
 
 <div style="display:flex;gap:8px">
-<img src="https://github.com/user-attachments/assets/a21ff4ca-ee82-495c-a1a3-29fb396bfe5c" width="373">
-<img src="https://github.com/user-attachments/assets/984e0bab-e53a-4685-bbff-0a3a916d4d97" width="374">
+<img src="https://github.com/Yngu196/Schedule/blob/48fb7db0ac27d2aa4db662001d58e7e3f0196088/150202.png" width="373">
+<img src="https://github.com/Yngu196/Schedule/blob/48fb7db0ac27d2aa4db662001d58e7e3f0196088/150149.png" width="374">
 </div>
 
 ## 技术栈
