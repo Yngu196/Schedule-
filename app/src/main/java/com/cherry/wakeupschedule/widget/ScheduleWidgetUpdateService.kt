@@ -93,7 +93,9 @@ class WidgetBootReceiver : BroadcastReceiver() {
         if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
             context?.let {
                 ScheduleWidgetUpdateService.triggerUpdate(it)
+                ScheduleWidgetProvider().schedulePeriodicUpdate(it)
                 MinimalWidgetProvider().schedulePeriodicUpdate(it)
+                WidgetMidnightReceiver.scheduleMidnightUpdate(it)
             }
         }
     }
@@ -102,19 +104,17 @@ class WidgetBootReceiver : BroadcastReceiver() {
 class WidgetCourseEndReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         context?.let {
-            ScheduleWidgetProvider().onUpdate(
+            val provider = ScheduleWidgetProvider()
+            val appWidgetManager = AppWidgetManager.getInstance(it)
+            provider.onUpdate(
                 it,
-                AppWidgetManager.getInstance(it),
-                AppWidgetManager.getInstance(it).getAppWidgetIds(
-                    ComponentName(it, ScheduleWidgetProvider::class.java)
-                )
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(ComponentName(it, ScheduleWidgetProvider::class.java))
             )
             MinimalWidgetProvider().onUpdate(
                 it,
-                AppWidgetManager.getInstance(it),
-                AppWidgetManager.getInstance(it).getAppWidgetIds(
-                    ComponentName(it, MinimalWidgetProvider::class.java)
-                )
+                appWidgetManager,
+                appWidgetManager.getAppWidgetIds(ComponentName(it, MinimalWidgetProvider::class.java))
             )
             ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
@@ -148,6 +148,21 @@ class MinimalWidgetPeriodicReceiver : BroadcastReceiver() {
                 )
             )
             MinimalWidgetProvider().schedulePeriodicUpdate(it)
+            ScheduleWidgetUpdateService.scheduleNextUpdate(it)
+        }
+    }
+}
+
+class MinimalWidgetCourseEndReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        context?.let {
+            MinimalWidgetProvider().onUpdate(
+                it,
+                AppWidgetManager.getInstance(it),
+                AppWidgetManager.getInstance(it).getAppWidgetIds(
+                    ComponentName(it, MinimalWidgetProvider::class.java)
+                )
+            )
             ScheduleWidgetUpdateService.scheduleNextUpdate(it)
         }
     }

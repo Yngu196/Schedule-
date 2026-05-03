@@ -133,7 +133,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 WIDGET_MINIMAL_COURSE_END_REQUEST_CODE,
-                Intent(context, WidgetCourseEndReceiver::class.java),
+                Intent(context, MinimalWidgetCourseEndReceiver::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -152,7 +152,7 @@ class MinimalWidgetProvider : AppWidgetProvider() {
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 WIDGET_MINIMAL_COURSE_END_REQUEST_CODE,
-                Intent(context, WidgetCourseEndReceiver::class.java),
+                Intent(context, MinimalWidgetCourseEndReceiver::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             alarmManager.cancel(pendingIntent)

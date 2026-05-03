@@ -7,14 +7,11 @@ import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.CourseReminderWorker
 import com.cherry.wakeupschedule.service.NotificationHelper
 import com.cherry.wakeupschedule.service.SettingsManager
+import com.cherry.wakeupschedule.widget.ScheduleWidgetUpdateService
+import com.cherry.wakeupschedule.widget.WidgetMidnightReceiver
 
-/**
- * 应用Application类
- * 全局初始化闹钟服务和通知渠道
- */
 class App : Application() {
 
-    // 闹钟服务实例
     var alarmService: AlarmService? = null
 
     override fun onCreate() {
@@ -23,7 +20,6 @@ class App : Application() {
         android.util.Log.d("App", "Application onCreate called")
 
         try {
-            // 创建通知渠道（Android 8.0+必需）
             NotificationHelper(this).createNotificationChannels()
             android.util.Log.d("App", "Notification channels created")
         } catch (e: Exception) {
@@ -31,7 +27,6 @@ class App : Application() {
         }
 
         try {
-            // 初始化课程数据管理器（确保Widget可以访问）
             CourseDataManager.getInstance(this)
             android.util.Log.d("App", "CourseDataManager initialized successfully")
         } catch (e: Exception) {
@@ -39,15 +34,21 @@ class App : Application() {
         }
 
         try {
-            // 初始化闹钟服务
             alarmService = AlarmService(this)
             android.util.Log.d("App", "AlarmService initialized successfully")
         } catch (e: Exception) {
             android.util.Log.e("App", "Failed to initialize AlarmService", e)
         }
+
+        try {
+            ScheduleWidgetUpdateService.scheduleNextUpdate(this)
+            WidgetMidnightReceiver.scheduleMidnightUpdate(this)
+            android.util.Log.d("App", "Widget update chains initialized")
+        } catch (e: Exception) {
+            android.util.Log.e("App", "Failed to initialize widget update chains", e)
+        }
     }
 
-    // 重新注册所有课程通知
     fun registerAllCourseNotifications() {
         if (SettingsManager(this).isAlarmEnabled()) {
             alarmService?.registerAllCourseNotifications()
@@ -56,7 +57,6 @@ class App : Application() {
     }
 
     companion object {
-        // Application单例
         lateinit var instance: App
             private set
     }

@@ -123,6 +123,11 @@
             android:name=".widget.MinimalWidgetPeriodicReceiver"
             android:exported="false" />
 
+        <!-- Minimal小组件课程结束更新接收器 -->
+        <receiver
+            android:name=".widget.MinimalWidgetCourseEndReceiver"
+            android:exported="false" />
+
         <!-- 时间变化监听接收器 -->
         <receiver
             android:name=".widget.WidgetTimeChangedReceiver"

@@ -9,13 +9,15 @@ class WidgetTimeChangedReceiver : BroadcastReceiver() {
         context ?: return
         when (intent?.action) {
             Intent.ACTION_TIME_TICK -> {
-                MinimalWidgetProvider.triggerUpdate(context)
                 ScheduleWidgetProvider.triggerUpdate(context)
+                MinimalWidgetProvider.triggerUpdate(context)
             }
             Intent.ACTION_DATE_CHANGED,
             Intent.ACTION_TIME_CHANGED -> {
                 ScheduleWidgetProvider.triggerUpdate(context)
                 MinimalWidgetProvider.triggerUpdate(context)
+                WidgetMidnightReceiver.scheduleMidnightUpdate(context)
+                ScheduleWidgetUpdateService.scheduleNextUpdate(context)
             }
         }
     }
