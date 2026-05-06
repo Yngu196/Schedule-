@@ -35,8 +35,8 @@
 ### 预览图
 
 <div style="display:flex;gap:8px">
-<img src="https://github.com/Yngu196/Schedule/blob/48fb7db0ac27d2aa4db662001d58e7e3f0196088/150202.png" width="373">
-<img src="https://github.com/Yngu196/Schedule/blob/48fb7db0ac27d2aa4db662001d58e7e3f0196088/150149.png" width="374">
+<img src="https://github.com/Yngu196/Schedule/blob/a59162a74e781869cc81244a24210ae464f8b445/%E6%9C%AC%E5%91%A8%E8%AF%BE%E7%A8%8B%E9%A2%84%E8%A7%88%E5%9B%BE.png" width="373">
+<img src="https://github.com/Yngu196/Schedule/blob/a59162a74e781869cc81244a24210ae464f8b445/%E4%BB%8A%E6%97%A5%E8%AF%BE%E7%A8%8B%E9%A2%84%E8%A7%88%E5%9B%BE.png" width="374">
 </div>
 
 ## 技术栈
