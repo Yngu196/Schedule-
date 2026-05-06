@@ -432,11 +432,55 @@
 
             </ScrollView>
 
+            <!-- 课程总览视图 -->
+            <LinearLayout
+                android:id="@+id/layout_overview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- 标题栏 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp"
+                    android:background="@color/purple_500">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="课程全览"
+                        android:textSize="18sp"
+                        android:textColor="@color/white"
+                        android:textStyle="bold"
+                        android:gravity="center" />
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#EEEEEE" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_overview_courses"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:padding="8dp"
+                    android:clipToPadding="false" />
+
+            </LinearLayout>
+
         </FrameLayout>
 
     </LinearLayout>
 
-    <!-- 今日/周切换按钮 -->
+    <!-- 悬浮球按钮 -->
     <RelativeLayout
         android:id="@+id/btn_view_toggle_parent"
         android:layout_width="match_parent"

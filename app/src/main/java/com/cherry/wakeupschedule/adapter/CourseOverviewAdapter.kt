@@ -1,7 +1,6 @@
 package com.cherry.wakeupschedule.adapter
 
 import android.content.Context
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,12 +9,17 @@ import androidx.recyclerview.widget.RecyclerView
 import com.cherry.wakeupschedule.R
 import com.cherry.wakeupschedule.model.Course
 
+/**
+ * 课程全览适配器
+ * 用于在RecyclerView中展示课程列表
+ */
 class CourseOverviewAdapter(
     private val context: Context,
     private val courses: List<Course>,
     private val courseColors: IntArray
 ) : RecyclerView.Adapter<CourseOverviewAdapter.ViewHolder>() {
 
+    // ViewHolder类，用于缓存视图引用
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val colorIndicator: View = view.findViewById(R.id.color_indicator)
         val tvCourseName: TextView = view.findViewById(R.id.tv_course_name)

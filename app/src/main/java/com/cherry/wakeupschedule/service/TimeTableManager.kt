@@ -5,6 +5,10 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
+/**
+ * 时间表管理器
+ * 负责课程时间段的读取和保存
+ */
 class TimeTableManager private constructor(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

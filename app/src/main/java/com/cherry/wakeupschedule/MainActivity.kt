@@ -34,6 +34,8 @@ import androidx.lifecycle.ViewModelProvider
 import com.cherry.wakeupschedule.App
 import com.cherry.wakeupschedule.databinding.ActivityMainBinding
 import com.cherry.wakeupschedule.model.Course
+import com.cherry.wakeupschedule.model.AppSettings
+import com.cherry.wakeupschedule.model.BackupData
 import com.cherry.wakeupschedule.service.CourseDataManager
 import com.cherry.wakeupschedule.service.ImportService
 import com.cherry.wakeupschedule.service.SettingsManager
@@ -77,7 +79,8 @@ class MainActivity : AppCompatActivity() {
     private val countdownHandler = Handler(Looper.getMainLooper())
     private var countdownRunnable: Runnable? = null
 
-    private var isWeekView = true
+    // 视图状态："week"周视图，"day"日视图，"overview"课程全览
+    private var currentViewState = "week"
 
     // 拖动相关
     private var isDragging = false
@@ -360,6 +363,9 @@ class MainActivity : AppCompatActivity() {
                 override fun onAnimationEnd(animation: Animator) {
                     originalX = targetX
                     originalY = targetY
+                    // 保存悬浮球位置
+                    settingsManager.setFloatButtonX(targetX)
+                    settingsManager.setFloatButtonY(targetY)
                 }
             })
             start()
@@ -383,32 +389,94 @@ class MainActivity : AppCompatActivity() {
         }
         setupDragListener()
         restoreViewMode()
+        restoreFloatButtonPosition()
     }
 
     private fun toggleViewMode() {
-        isWeekView = !isWeekView
-        settingsManager.setViewMode(if (isWeekView) "week" else "day")
-        updateViewMode()
+        // 三种状态循环切换：周 -> 今 -> 总 -> 周
+        when (currentViewState) {
+            "week" -> {
+                currentViewState = "day"
+                settingsManager.setViewState(currentViewState)
+                updateViewMode()
+            }
+            "day" -> {
+                currentViewState = "overview"
+                settingsManager.setViewState(currentViewState)
+                updateViewMode()
+            }
+            "overview" -> {
+                currentViewState = "week"
+                settingsManager.setViewState(currentViewState)
+                updateViewMode()
+            }
+        }
     }
 
+
+
     private fun updateViewMode() {
-        if (isWeekView) {
-            binding.scrollView.visibility = View.VISIBLE
-            binding.scrollViewToday.visibility = View.GONE
-            binding.layoutHeaderWeek.visibility = View.VISIBLE
-            binding.tvToggleLabel.text = "周"
-        } else {
-            binding.scrollView.visibility = View.GONE
-            binding.scrollViewToday.visibility = View.VISIBLE
-            binding.layoutHeaderWeek.visibility = View.GONE
-            binding.tvToggleLabel.text = "今"
-            updateTodayView()
+        when (currentViewState) {
+            "week" -> {
+                binding.scrollView.visibility = View.VISIBLE
+                binding.scrollViewToday.visibility = View.GONE
+                binding.layoutOverview.visibility = View.GONE
+                binding.layoutHeaderWeek.visibility = View.VISIBLE
+                binding.tvToggleLabel.text = "周"
+            }
+            "day" -> {
+                binding.scrollView.visibility = View.GONE
+                binding.scrollViewToday.visibility = View.VISIBLE
+                binding.layoutOverview.visibility = View.GONE
+                binding.layoutHeaderWeek.visibility = View.GONE
+                binding.tvToggleLabel.text = "今"
+                updateTodayView()
+            }
+            "overview" -> {
+                binding.scrollView.visibility = View.GONE
+                binding.scrollViewToday.visibility = View.GONE
+                binding.layoutOverview.visibility = View.VISIBLE
+                binding.layoutHeaderWeek.visibility = View.GONE
+                binding.tvToggleLabel.text = "总"
+                setupOverviewRecyclerView()
+            }
         }
     }
 
     private fun restoreViewMode() {
-        isWeekView = settingsManager.getViewMode() == "week"
+        val savedState = settingsManager.getViewState()
+        currentViewState = if (savedState == "overview") {
+            "day"
+        } else {
+            savedState
+        }
         updateViewMode()
+    }
+
+    private fun restoreFloatButtonPosition() {
+        val savedX = settingsManager.getFloatButtonX()
+        val savedY = settingsManager.getFloatButtonY()
+        
+        if (savedX >= 0f && savedY >= 0f) {
+            // 有保存的位置，使用post确保视图已布局
+            binding.btnViewToggle.post {
+                binding.btnViewToggle.x = savedX
+                binding.btnViewToggle.y = savedY
+            }
+        }
+    }
+
+    private fun setupOverviewRecyclerView() {
+        val rvOverview = findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_overview_courses)
+        
+        if (rvOverview.adapter == null) {
+            val courses = CourseDataManager.getInstance(this).getAllCourses()
+            val sortedCourses = courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startTime }))
+            
+            val adapter = com.cherry.wakeupschedule.adapter.CourseOverviewAdapter(this, sortedCourses, getCourseColors())
+            rvOverview.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+            rvOverview.adapter = adapter
+        }
     }
 
     private fun updateTodayView() {
@@ -671,9 +739,10 @@ class MainActivity : AppCompatActivity() {
             showExportDialog()
         }
 
-        // 更多按钮
+        // 更多按钮 - 直接进入设置
         binding.btnMore.setOnClickListener {
-            showMoreOptionsDialog()
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
 
         // 周次显示点击 - 快速跳转到当前周
@@ -798,31 +867,101 @@ class MainActivity : AppCompatActivity() {
             val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
             val fileName = "schedule_backup_${dateFormat.format(Date())}.json"
             
-            // 转换课程数据为JSON
-            val gson = Gson()
-            val coursesJson = gson.toJson(courses)
+            // 创建备份数据，包含课程和配置
+            val backupData = BackupData(
+                version = 1,
+                exportTime = System.currentTimeMillis(),
+                courses = courses,
+                settings = AppSettings(
+                    currentSemester = settingsManager.getCurrentSemester(),
+                    defaultWeek = settingsManager.getDefaultWeek(),
+                    defaultAlarmMinutes = settingsManager.getDefaultAlarmMinutes(),
+                    autoSwitchWeek = settingsManager.getAutoSwitchWeek(),
+                    alarmEnabled = settingsManager.isAlarmEnabled(),
+                    courseCardAlpha = settingsManager.getCourseCardAlpha(),
+                    showNonCurrentWeekCourses = settingsManager.isShowNonCurrentWeekCourses(),
+                    nonCurrentWeekAlpha = settingsManager.getNonCurrentWeekAlpha(),
+                    fontSize = settingsManager.getFontSize(),
+                    semesterStartDate = settingsManager.getSemesterStartDate(),
+                    customSemesters = settingsManager.getCustomSemesters(),
+                    courseColorThemeIndex = settingsManager.getCourseColorThemeIndex(),
+                    backgroundThemeIndex = settingsManager.getBackgroundThemeIndex(),
+                    backgroundType = settingsManager.getBackgroundTypeString(),
+                    customBackgroundPath = settingsManager.getCustomBackgroundPath()
+                )
+            )
             
-            // 创建文件并写入数据
-            val file = File(getExternalFilesDir(null), fileName)
-            file.writeText(coursesJson, StandardCharsets.UTF_8)
+            // 转换备份数据为JSON
+            val gson = Gson()
+            val backupJson = gson.toJson(backupData)
+            
+            // 保存到应用私有目录（用于分享）
+            val privateFile = File(getExternalFilesDir(null), fileName)
+            privateFile.writeText(backupJson, StandardCharsets.UTF_8)
+            
+            // 保存到公共 Downloads 目录（用户容易找到）
+            val publicFileUri = saveToPublicDownloads(fileName, backupJson)
             
             // 显示成功提示
-            Toast.makeText(this, "备份已保存到: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+            if (publicFileUri != null) {
+                Toast.makeText(this, "备份已保存到下载文件夹: $fileName", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "备份已保存到: ${privateFile.absolutePath}", Toast.LENGTH_LONG).show()
+            }
             
-            // 可选：分享备份文件
-            shareBackupFile(file)
+            // 分享备份文件
+            shareBackupFile(privateFile)
         } catch (e: Exception) {
             Log.e("MainActivity", "导出备份失败", e)
             Toast.makeText(this, "导出备份失败: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
     
+    private fun saveToPublicDownloads(fileName: String, content: String): android.net.Uri? {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                // Android 10+ 使用 MediaStore
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+                }
+                
+                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                uri?.let {
+                    contentResolver.openOutputStream(it)?.use { outputStream ->
+                        outputStream.write(content.toByteArray(StandardCharsets.UTF_8))
+                    }
+                    contentValues.clear()
+                    contentValues.put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+                    contentResolver.update(it, contentValues, null, null)
+                }
+                uri
+            } else {
+                // Android 9 及以下，保存到 Downloads 目录
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val file = File(downloadsDir, fileName)
+                file.writeText(content, StandardCharsets.UTF_8)
+                android.net.Uri.fromFile(file)
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "保存到公共目录失败", e)
+            null
+        }
+    }
+    
     private fun shareBackupFile(file: File) {
+        val fileUri = androidx.core.content.FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            file
+        )
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/json"
-            putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file))
+            putExtra(Intent.EXTRA_STREAM, fileUri)
             putExtra(Intent.EXTRA_SUBJECT, "课程表备份")
             putExtra(Intent.EXTRA_TEXT, "这是我的课程表备份文件，您可以在Schedule课程表App中导入恢复")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(intent, "分享备份文件"))
     }
@@ -839,7 +978,7 @@ class MainActivity : AppCompatActivity() {
                 displayCourses(allCourses)
                 syncTimeAxisHeight()
             }
-            if (!isWeekView) {
+            if (currentViewState == "day") {
                 updateTodayView()
             }
         }
@@ -850,18 +989,24 @@ class MainActivity : AppCompatActivity() {
         binding.tvDate.text = dateFormat.format(calendar.time)
         updateWeekDisplay()
 
-        // 更新日期数字
         val dateViews = listOf(
             binding.tvDate1, binding.tvDate2, binding.tvDate3,
             binding.tvDate4, binding.tvDate5, binding.tvDate6, binding.tvDate7
         )
 
-        // 获取本周一的日期
         val weekCalendar = Calendar.getInstance()
         weekCalendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
 
-        dateViews.forEachIndexed { _, textView ->
+        val currentDayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+        val adjustedDayOfWeek = if (currentDayOfWeek == Calendar.SUNDAY) 7 else currentDayOfWeek - 1
+
+        dateViews.forEachIndexed { index, textView ->
             textView.text = weekCalendar.get(Calendar.DAY_OF_MONTH).toString()
+            if (index + 1 == adjustedDayOfWeek) {
+                textView.setBackgroundResource(R.drawable.bg_date_selected)
+            } else {
+                textView.background = null
+            }
             weekCalendar.add(Calendar.DAY_OF_MONTH, 1)
         }
     }
@@ -1229,16 +1374,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMoreOptionsDialog() {
-        val options = arrayOf("课程全览", "设置")
+        val options = arrayOf("设置")
         AlertDialog.Builder(this)
             .setTitle("更多选项")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> {
-                        val intent = Intent(this, CourseOverviewActivity::class.java)
-                        startActivity(intent)
-                    }
-                    1 -> {
                         val intent = Intent(this, SettingsActivity::class.java)
                         startActivity(intent)
                     }
@@ -1288,6 +1429,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 从课程总览返回时，确保显示正确的视图
+        // 如果之前是在day视图，返回后显示"今"，下次点击回到"周"
+        // 为了更好的用户体验，我们恢复到之前的状态，悬浮球文字也要对应显示
+        val savedState = settingsManager.getViewState()
+        currentViewState = if (savedState == "overview") {
+            "day"
+        } else {
+            savedState
+        }
+        updateViewMode()
+        
         // 重新计算当前周
         currentWeek = calculateCurrentWeek()
         // 同步默认周，避免其他模块仍使用旧周次
@@ -1307,6 +1459,8 @@ class MainActivity : AppCompatActivity() {
                 syncTimeAxisHeight()
             }
         }
+        // 更新日期显示
+        updateDateDisplay()
 
         // 为所有课程设置闹钟
         setupAllCoursesAlarms()
@@ -1412,7 +1566,11 @@ class MainActivity : AppCompatActivity() {
             contentResolver.openInputStream(uri)?.use { inputStream ->
                 val content = inputStream.bufferedReader().use { it.readText() }
                 if (content.trim().startsWith("[")) {
+                    // 旧格式：纯课程数组
                     importFromJson(content)
+                } else if (content.trim().startsWith("{")) {
+                    // 新格式：包含版本和配置的备份
+                    importFromBackupData(content)
                 } else {
                     Toast.makeText(this, "不支持的文件格式", Toast.LENGTH_SHORT).show()
                 }
@@ -1420,6 +1578,59 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Toast.makeText(this, "解析失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun importFromBackupData(json: String) {
+        try {
+            val gson = Gson()
+            val backupData = gson.fromJson(json, BackupData::class.java)
+            
+            // 导入课程
+            if (backupData.courses.isNotEmpty()) {
+                viewModel.addCourses(backupData.courses)
+                Toast.makeText(this, "成功导入 ${backupData.courses.size} 门课程", Toast.LENGTH_LONG).show()
+            }
+            
+            // 询问是否导入配置
+            showImportSettingsDialog(backupData.settings)
+            
+            // 更新小组件
+            updateWidget()
+        } catch (e: Exception) {
+            Toast.makeText(this, "解析备份失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showImportSettingsDialog(settings: AppSettings) {
+        AlertDialog.Builder(this)
+            .setTitle("导入配置")
+            .setMessage("是否导入备份中的配置信息？\n\n包括：学期、主题、背景、卡片透明度等设置")
+            .setPositiveButton("导入") { _, _ ->
+                applySettings(settings)
+                Toast.makeText(this, "配置导入成功", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("跳过") { _, _ ->
+                Toast.makeText(this, "已跳过配置导入", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun applySettings(settings: AppSettings) {
+        settingsManager.setCurrentSemester(settings.currentSemester)
+        settingsManager.setDefaultWeek(settings.defaultWeek)
+        settingsManager.setDefaultAlarmMinutes(settings.defaultAlarmMinutes)
+        settingsManager.setAutoSwitchWeek(settings.autoSwitchWeek)
+        settingsManager.setAlarmEnabled(settings.alarmEnabled)
+        settingsManager.setCourseCardAlpha(settings.courseCardAlpha)
+        settingsManager.setShowNonCurrentWeekCourses(settings.showNonCurrentWeekCourses)
+        settingsManager.setNonCurrentWeekAlpha(settings.nonCurrentWeekAlpha)
+        settingsManager.setFontSize(settings.fontSize)
+        settingsManager.setSemesterStartDate(settings.semesterStartDate)
+        settingsManager.saveCustomSemesters(settings.customSemesters)
+        settingsManager.setCourseColorThemeIndex(settings.courseColorThemeIndex)
+        settingsManager.setBackgroundThemeIndex(settings.backgroundThemeIndex)
+        settingsManager.setBackgroundTypeString(settings.backgroundType)
+        settingsManager.setCustomBackgroundPath(settings.customBackgroundPath)
     }
 
     private fun importFromJson(json: String) {
@@ -1514,10 +1725,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (isWeekView && allCourses.isNotEmpty()) {
+        if (currentViewState == "week" && allCourses.isNotEmpty()) {
             displayCourses(allCourses)
             syncTimeAxisHeight()
         }
+
+        updateDateDisplay()
     }
 
     private fun getCourseStartMinutes(course: Course): Int {

@@ -40,6 +40,9 @@ class SettingsManager(context: Context) {
         private const val KEY_LAST_UPDATE_CHECK = "last_update_check"        // 上次检查更新日期
         private const val KEY_COURSE_COLOR_THEME = "course_color_theme"     // 卡片配色主题索引
         private const val KEY_BACKGROUND_THEME = "background_theme"         // 背景主题索引
+        private const val KEY_FLOAT_BUTTON_X = "float_button_x"             // 悬浮球X位置
+        private const val KEY_FLOAT_BUTTON_Y = "float_button_y"             // 悬浮球Y位置
+        private const val KEY_VIEW_STATE = "view_state"                     // 视图状态（week/day/overview）
 
         private const val DEFAULT_SEMESTER = "2024-2025学年 第一学期"
         private const val DEFAULT_WEEK = 1                                     // 默认第1周
@@ -53,7 +56,7 @@ class SettingsManager(context: Context) {
         private const val DEFAULT_COURSE_CARD_ALPHA = 0.85f                    // 默认卡片透明度85%
         private const val DEFAULT_SHOW_NON_CURRENT_WEEK_COURSES = true         // 默认显示非本周课程
         private const val DEFAULT_NON_CURRENT_WEEK_ALPHA = 0.3f                // 非本周课程默认30%透明度
-        private const val DEFAULT_COLOR_THEME = 0                               // 默认清新马卡龙
+        private const val DEFAULT_COLOR_THEME = 1                              // 默认莫兰迪低灰
     }
 
     // ==================== 学期相关 ====================
@@ -589,5 +592,50 @@ class SettingsManager(context: Context) {
             "custom" -> BackgroundType.IMAGE
             else -> getCurrentBackgroundTheme().type
         }
+    }
+
+    // ==================== 悬浮球相关 ====================
+
+    /**
+     * 获取悬浮球X位置
+     */
+    fun getFloatButtonX(): Float {
+        return sharedPreferences.getFloat(KEY_FLOAT_BUTTON_X, -1f)
+    }
+
+    /**
+     * 设置悬浮球X位置
+     */
+    fun setFloatButtonX(x: Float) {
+        sharedPreferences.edit().putFloat(KEY_FLOAT_BUTTON_X, x).apply()
+    }
+
+    /**
+     * 获取悬浮球Y位置
+     */
+    fun getFloatButtonY(): Float {
+        return sharedPreferences.getFloat(KEY_FLOAT_BUTTON_Y, -1f)
+    }
+
+    /**
+     * 设置悬浮球Y位置
+     */
+    fun setFloatButtonY(y: Float) {
+        sharedPreferences.edit().putFloat(KEY_FLOAT_BUTTON_Y, y).apply()
+    }
+
+    /**
+     * 获取视图状态
+     * @return "week"周视图，"day"日视图，"overview"课程全览
+     */
+    fun getViewState(): String {
+        return sharedPreferences.getString(KEY_VIEW_STATE, "week") ?: "week"
+    }
+
+    /**
+     * 设置视图状态
+     */
+    fun setViewState(state: String) {
+        sharedPreferences.edit().putString(KEY_VIEW_STATE, state).apply()
     }
 }
