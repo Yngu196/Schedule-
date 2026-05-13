@@ -31,12 +31,49 @@
         android:minHeight="250dp"
         android:maxHeight="400dp" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="下载方式"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/btn_download_original"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GitHub 原始下载"
+            android:textSize="14sp"
+            android:textColor="@android:color/black"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackground" />
+
+        <TextView
+            android:id="@+id/btn_download_proxy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GitHub Proxy 加速下载 (国内推荐)"
+            android:textSize="14sp"
+            android:textColor="#4CAF50"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackground" />
+
+    </LinearLayout>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="end"
-        android:paddingTop="16dp">
+        android:gravity="end">
 
         <TextView
             android:id="@+id/btn_later"
@@ -45,16 +82,6 @@
             android:text="稍后"
             android:textSize="14sp"
             android:textColor="@android:color/black"
-            android:padding="8dp"
-            android:layout_marginEnd="8dp" />
-
-        <TextView
-            android:id="@+id/btn_download"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="前往下载"
-            android:textSize="14sp"
-            android:textColor="#4CAF50"
             android:padding="8dp" />
 
     </LinearLayout>

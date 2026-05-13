@@ -29,6 +29,7 @@ class UpdateService(private val context: Context) {
     companion object {
         private const val TAG = "UpdateService"
         private const val GITHUB_API_URL = "https://api.github.com/repos/Yngu196/Schedule/releases/latest"
+        private const val GITHUB_PROXY_URL = "https://ghproxy.com/"
     }
 
     private val currentVersion: String = com.cherry.wakeupschedule.BuildConfig.VERSION_NAME
@@ -208,8 +209,19 @@ class UpdateService(private val context: Context) {
             .setView(dialogView)
             .create()
         
-        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download).setOnClickListener {
+        val proxyUrl = if (url.startsWith("https://github.com/") || url.startsWith("https://objects.githubusercontent.com/")) {
+            GITHUB_PROXY_URL + url
+        } else {
+            url
+        }
+        
+        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_original).setOnClickListener {
             openDownloadPage(url)
+            dialog.dismiss()
+        }
+        
+        dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_proxy).setOnClickListener {
+            openDownloadPage(proxyUrl)
             dialog.dismiss()
         }
         
