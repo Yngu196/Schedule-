@@ -15,8 +15,8 @@ android {
         applicationId "com.cherry.wakeupschedule"
         minSdk 26
         targetSdk 33
-        versionCode 1465
-        versionName "1.6.8"
+        versionCode 1466
+        versionName "1.6.9"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -31,7 +31,7 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("wakeup-schedule-key.jks")
+            storeFile file("../wakeup-schedule-key.jks")
             storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: ""
             keyAlias "wakeup_schedule"
             keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: ""
