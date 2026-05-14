@@ -864,6 +864,17 @@ class MainActivity : AppCompatActivity() {
             val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
             val fileName = "schedule_backup_${dateFormat.format(Date())}.json"
             
+            // 获取时间表信息
+            val timeTableManager = TimeTableManager.getInstance(this)
+            val timeSlots = timeTableManager.getTimeSlots().map {
+                BackupData.TimeSlotData(
+                    node = it.node,
+                    startTime = it.startTime,
+                    endTime = it.endTime
+                )
+            }
+            val maxNodes = timeTableManager.getMaxNodes()
+            
             // 创建备份数据，包含课程和配置
             val backupData = BackupData(
                 version = 1,
@@ -885,7 +896,9 @@ class MainActivity : AppCompatActivity() {
                     backgroundThemeIndex = settingsManager.getBackgroundThemeIndex(),
                     backgroundType = settingsManager.getBackgroundTypeString(),
                     customBackgroundPath = settingsManager.getCustomBackgroundPath()
-                )
+                ),
+                timeSlots = timeSlots,
+                maxNodes = maxNodes
             )
             
             // 转换备份数据为JSON
@@ -1787,8 +1800,8 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "成功导入 ${backupData.courses.size} 门课程", Toast.LENGTH_LONG).show()
             }
             
-            // 询问是否导入配置
-            showImportSettingsDialog(backupData.settings)
+            // 询问是否导入配置和时间表
+            showImportSettingsDialog(backupData.settings, backupData.timeSlots, backupData.maxNodes)
             
             // 更新小组件
             updateWidget()
@@ -1797,13 +1810,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showImportSettingsDialog(settings: AppSettings) {
+    private fun showImportSettingsDialog(
+        settings: AppSettings,
+        timeSlots: List<BackupData.TimeSlotData>?,
+        maxNodes: Int?
+    ) {
+        val hasTimeTableData = timeSlots != null && timeSlots.isNotEmpty() && maxNodes != null
+        val message = if (hasTimeTableData) {
+            "是否导入备份中的配置信息？\n\n包括：学期、主题、背景、卡片透明度等设置\n\n以及：时间表配置（节数和上课时间）"
+        } else {
+            "是否导入备份中的配置信息？\n\n包括：学期、主题、背景、卡片透明度等设置"
+        }
+        
         AlertDialog.Builder(this)
             .setTitle("导入配置")
-            .setMessage("是否导入备份中的配置信息？\n\n包括：学期、主题、背景、卡片透明度等设置")
+            .setMessage(message)
             .setPositiveButton("导入") { _, _ ->
                 applySettings(settings)
-                Toast.makeText(this, "配置导入成功", Toast.LENGTH_SHORT).show()
+                if (hasTimeTableData && timeSlots != null && maxNodes != null) {
+                    applyTimeTable(timeSlots, maxNodes)
+                    Toast.makeText(this, "配置和时间表导入成功", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "配置导入成功", Toast.LENGTH_SHORT).show()
+                }
             }
             .setNegativeButton("跳过") { _, _ ->
                 Toast.makeText(this, "已跳过配置导入", Toast.LENGTH_SHORT).show()
@@ -1827,6 +1856,24 @@ class MainActivity : AppCompatActivity() {
         settingsManager.setBackgroundThemeIndex(settings.backgroundThemeIndex)
         settingsManager.setBackgroundTypeString(settings.backgroundType)
         settingsManager.setCustomBackgroundPath(settings.customBackgroundPath)
+    }
+
+    private fun applyTimeTable(timeSlots: List<BackupData.TimeSlotData>, maxNodes: Int) {
+        val timeTableManager = TimeTableManager.getInstance(this)
+        // 转换时间槽数据
+        val convertedTimeSlots = timeSlots.map {
+            TimeTableManager.TimeSlot(
+                node = it.node,
+                startTime = it.startTime,
+                endTime = it.endTime
+            )
+        }
+        timeTableManager.saveTimeSlots(convertedTimeSlots)
+        timeTableManager.setMaxNodes(maxNodes)
+        // 重新生成时间轴
+        generateTimeAxis()
+        // 重新显示课程
+        viewModel.loadCoursesForWeek(displayWeek)
     }
 
     private fun importFromJson(json: String) {
