@@ -36,7 +36,14 @@ class CourseViewModel(application: Application) : AndroidViewModel(application) 
             courseDataManager.coursesFlow.collect { allCourses ->
                 val week = activeWeek
                 val coursesForWeek = allCourses.filter { course ->
-                    week in course.startWeek..course.endWeek
+                    val isInWeekRange = week in course.startWeek..course.endWeek
+                    val isWeekTypeMatch = when (course.weekType) {
+                        0 -> true // 每周
+                        1 -> week % 2 == 1 // 单周
+                        2 -> week % 2 == 0 // 双周
+                        else -> true
+                    }
+                    isInWeekRange && isWeekTypeMatch
                 }
                 _courses.postValue(coursesForWeek)
             }

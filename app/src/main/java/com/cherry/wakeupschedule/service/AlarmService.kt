@@ -60,8 +60,19 @@ class AlarmService(private val context: Context) {
         // 检查单双周是否匹配
         if (!isWeekTypeMatched(course, currentWeek)) return
 
-        // 设置为课程所在星期
-        calendar.set(Calendar.DAY_OF_WEEK, course.dayOfWeek + 1)
+        // 设置为课程所在星期（注意：Calendar.SUNDAY=1, Calendar.MONDAY=2, ..., Calendar.SATURDAY=7）
+        // 而我们的课程 dayOfWeek 是 1=周一，7=周日
+        val calendarDayOfWeek = when (course.dayOfWeek) {
+            1 -> Calendar.MONDAY
+            2 -> Calendar.TUESDAY
+            3 -> Calendar.WEDNESDAY
+            4 -> Calendar.THURSDAY
+            5 -> Calendar.FRIDAY
+            6 -> Calendar.SATURDAY
+            7 -> Calendar.SUNDAY
+            else -> Calendar.MONDAY
+        }
+        calendar.set(Calendar.DAY_OF_WEEK, calendarDayOfWeek)
 
         // 获取课程时间段的开始时间
         val timeSlots = timeTableManager.getTimeSlots()
@@ -182,8 +193,18 @@ class AlarmService(private val context: Context) {
         if (currentWeek < course.startWeek || currentWeek > course.endWeek) return
         if (!isWeekTypeMatched(course, currentWeek)) return
 
-        // 设置课程日期和时间
-        calendar.set(Calendar.DAY_OF_WEEK, course.dayOfWeek + 1)
+        // 设置课程日期和时间（注意：Calendar.SUNDAY=1, Calendar.MONDAY=2, ..., Calendar.SATURDAY=7）
+        val calendarDayOfWeek = when (course.dayOfWeek) {
+            1 -> Calendar.MONDAY
+            2 -> Calendar.TUESDAY
+            3 -> Calendar.WEDNESDAY
+            4 -> Calendar.THURSDAY
+            5 -> Calendar.FRIDAY
+            6 -> Calendar.SATURDAY
+            7 -> Calendar.SUNDAY
+            else -> Calendar.MONDAY
+        }
+        calendar.set(Calendar.DAY_OF_WEEK, calendarDayOfWeek)
 
         val timeSlots = timeTableManager.getTimeSlots()
         val timeSlot = timeSlots.find { it.node == course.startTime }
@@ -271,7 +292,19 @@ class AlarmService(private val context: Context) {
             if (!isWeekTypeMatched(course, week)) continue
 
             val calendar = Calendar.getInstance()
-            calendar.set(Calendar.DAY_OF_WEEK, course.dayOfWeek + 1)
+            // 设置为课程所在星期（注意：Calendar.SUNDAY=1, Calendar.MONDAY=2, ..., Calendar.SATURDAY=7）
+            // 而我们的课程 dayOfWeek 是 1=周一，7=周日
+            val calendarDayOfWeek = when (course.dayOfWeek) {
+                1 -> Calendar.MONDAY
+                2 -> Calendar.TUESDAY
+                3 -> Calendar.WEDNESDAY
+                4 -> Calendar.THURSDAY
+                5 -> Calendar.FRIDAY
+                6 -> Calendar.SATURDAY
+                7 -> Calendar.SUNDAY
+                else -> Calendar.MONDAY
+            }
+            calendar.set(Calendar.DAY_OF_WEEK, calendarDayOfWeek)
 
             val timeSlots = timeTableManager.getTimeSlots()
             val timeSlot = timeSlots.find { it.node == course.startTime }
@@ -293,8 +326,13 @@ class AlarmService(private val context: Context) {
             }
             calendar.set(Calendar.SECOND, 0)
             calendar.set(Calendar.MILLISECOND, 0)
-            // 设置到对应周
-            calendar.set(Calendar.WEEK_OF_YEAR, calendar.get(Calendar.WEEK_OF_YEAR) + (week - getCurrentWeek()))
+
+            // 计算日期差（更可靠的方法）
+            val currentWeek = getCurrentWeek()
+            val weekDiff = week - currentWeek
+            if (weekDiff != 0) {
+                calendar.add(Calendar.DAY_OF_YEAR, weekDiff * 7)
+            }
 
             // 跳过已过去的时间
             if (calendar.timeInMillis <= System.currentTimeMillis()) {

@@ -28,7 +28,7 @@ class UpdateService(private val context: Context) {
 
     companion object {
         private const val TAG = "UpdateService"
-        private const val GITHUB_API_URL = "https://api.github.com/repos/Yngu196/Schedule/releases/latest"
+        private const val GITHUB_API_URL = "https://api.github.com/repos/Yngu196/Schedule/releases"
         private const val GITHUB_PROXY_URL = "https://ghproxy.com/"
         private const val LANZOU_URL = "https://wwbph.lanzn.com/b019vqfy9c"
     }
@@ -99,7 +99,7 @@ class UpdateService(private val context: Context) {
         }
     }
 
-    // 获取最新发布信息
+    // 获取最新发布信息（包括预发布版本）
     private suspend fun fetchLatestRelease(): Quartet<Boolean, String, String, String> = withContext(Dispatchers.IO) {
         try {
             val url = URL(GITHUB_API_URL)
@@ -114,26 +114,39 @@ class UpdateService(private val context: Context) {
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
                 val response = reader.readText()
                 reader.close()
-                val json = JSONObject(response)
-                latestVersion = json.optString("tag_name", "").removePrefix("v")
-                releaseNotes = json.optString("body", "")
-
-                // 从 assets 中获取直接的 APK 下载链接
-                val assets = json.optJSONArray("assets")
-                if (assets != null) {
-                    for (i in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(i)
-                        val name = asset.optString("name", "")
-                        if (name.endsWith(".apk")) {
-                            downloadUrl = asset.optString("browser_download_url", "")
-                            break
+                
+                val releases = org.json.JSONArray(response)
+                if (releases.length() > 0) {
+                    // 遍历所有 release，找到最新的版本（包括预发布）
+                    for (i in 0 until releases.length()) {
+                        val json = releases.getJSONObject(i)
+                        val version = json.optString("tag_name", "").removePrefix("v")
+                        
+                        if (version.isNotEmpty()) {
+                            val assets = json.optJSONArray("assets")
+                            var apkUrl = ""
+                            if (assets != null) {
+                                for (j in 0 until assets.length()) {
+                                    val asset = assets.getJSONObject(j)
+                                    val name = asset.optString("name", "")
+                                    if (name.endsWith(".apk")) {
+                                        apkUrl = asset.optString("browser_download_url", "")
+                                        break
+                                    }
+                                }
+                            }
+                            if (apkUrl.isEmpty()) {
+                                apkUrl = json.optString("html_url", "")
+                            }
+                            
+                            // 检查这个版本是否比当前找到的更新
+                            if (isNewerVersion(version, latestVersion)) {
+                                latestVersion = version
+                                downloadUrl = apkUrl
+                                releaseNotes = json.optString("body", "")
+                            }
                         }
                     }
-                }
-
-                // 如果没有找到 APK asset，使用 release 页面的 URL
-                if (downloadUrl.isEmpty()) {
-                    downloadUrl = json.optString("html_url", "")
                 }
 
                 if (latestVersion.isNotEmpty() && downloadUrl.isNotEmpty()) {
@@ -148,18 +161,77 @@ class UpdateService(private val context: Context) {
         }
     }
 
-    // 比较版本号
+    // 检查 serverVersion 是否比 currentLatest 更新
+    private fun isNewerVersion(serverVersion: String, currentLatest: String): Boolean {
+        if (currentLatest.isEmpty()) return true
+        return compareVersions(serverVersion, currentLatest) > 0
+    }
+
+    // 检查是否有新版本（比当前应用版本更新）
     private fun isNewVersion(serverVersion: String): Boolean {
         if (serverVersion.isEmpty()) return false
-        val currentParts = currentVersion.split(".").map { it.toIntOrNull() ?: 0 }
-        val serverParts = serverVersion.split(".").map { it.toIntOrNull() ?: 0 }
-        for (i in 0 until maxOf(currentParts.size, serverParts.size)) {
-            val current = currentParts.getOrElse(i) { 0 }
-            val server = serverParts.getOrElse(i) { 0 }
-            if (server > current) return true
-            if (server < current) return false
+        return compareVersions(serverVersion, currentVersion) > 0
+    }
+
+    // 比较两个版本号，返回：
+    // >0: version1 > version2
+    // =0: version1 = version2
+    // <0: version1 < version2
+    private fun compareVersions(version1: String, version2: String): Int {
+        val parts1 = parseVersion(version1)
+        val parts2 = parseVersion(version2)
+        
+        // 比较主版本号
+        for (i in 0 until maxOf(parts1.first.size, parts2.first.size)) {
+            val v1 = parts1.first.getOrElse(i) { 0 }
+            val v2 = parts2.first.getOrElse(i) { 0 }
+            if (v1 > v2) return 1
+            if (v1 < v2) return -1
         }
-        return false
+        
+        // 如果主版本相同，比较预发布标识符
+        // 没有预发布标识符的版本 > 有预发布标识符的版本（正式版 > 测试版）
+        if (parts1.second.isEmpty() && parts2.second.isNotEmpty()) return 1
+        if (parts1.second.isNotEmpty() && parts2.second.isEmpty()) return -1
+        
+        // 如果都有预发布标识符，逐部分比较
+        for (i in 0 until maxOf(parts1.second.size, parts2.second.size)) {
+            val p1 = parts1.second.getOrElse(i) { "" }
+            val p2 = parts2.second.getOrElse(i) { "" }
+            val compare = comparePreReleasePart(p1, p2)
+            if (compare != 0) return compare
+        }
+        
+        return 0
+    }
+
+    // 解析版本号，返回（数字部分，预发布标识符）
+    private fun parseVersion(version: String): Pair<List<Int>, List<String>> {
+        val hyphenIndex = version.indexOf('-')
+        val mainPart = if (hyphenIndex >= 0) version.substring(0, hyphenIndex) else version
+        val preReleasePart = if (hyphenIndex >= 0) version.substring(hyphenIndex + 1) else ""
+        
+        val mainNumbers = mainPart.split('.').map { it.toIntOrNull() ?: 0 }
+        val preReleaseParts = if (preReleasePart.isEmpty()) emptyList() else preReleasePart.split('.')
+        
+        return Pair(mainNumbers, preReleaseParts)
+    }
+
+    // 比较预发布标识符的单个部分
+    private fun comparePreReleasePart(p1: String, p2: String): Int {
+        // 数字比较
+        val num1 = p1.toIntOrNull()
+        val num2 = p2.toIntOrNull()
+        
+        return if (num1 != null && num2 != null) {
+            num1.compareTo(num2)
+        } else if (num1 != null) {
+            -1 // 数字 < 字母
+        } else if (num2 != null) {
+            1 // 字母 > 数字
+        } else {
+            p1.compareTo(p2)
+        }
     }
 
     // 简单的 Markdown 到 HTML 转换
@@ -222,12 +294,12 @@ class UpdateService(private val context: Context) {
         }
         
         dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_proxy).setOnClickListener {
-            openDownloadPage(proxyUrl)
+            openDownloadWithSystemBrowser(proxyUrl)
             dialog.dismiss()
         }
-        
+
         dialogView.findViewById<TextView>(com.cherry.wakeupschedule.R.id.btn_download_lanzou).setOnClickListener {
-            openDownloadPage(LANZOU_URL)
+            openDownloadWithSystemBrowser(LANZOU_URL)
             showToast("蓝奏云下载密码: 666")
             dialog.dismiss()
         }
@@ -247,6 +319,17 @@ class UpdateService(private val context: Context) {
                 putExtra("url", downloadUrl)
                 putExtra("title", "下载更新")
             }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            showToast("无法打开下载页面")
+        }
+    }
+
+    private fun openDownloadWithSystemBrowser(downloadUrl: String) {
+        try {
+            // 直接用系统浏览器打开，处理 Proxy 等直接下载链接
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
         } catch (e: Exception) {

@@ -18,6 +18,7 @@ class AboutActivity : AppCompatActivity() {
 
         val btnBack = findViewById<ImageButton>(R.id.btn_back)
         val tvVersion = findViewById<TextView>(R.id.tv_version)
+        val llOfficialWebsite = findViewById<LinearLayout>(R.id.ll_official_website)
         val llGithub = findViewById<LinearLayout>(R.id.ll_github)
         val llLicense = findViewById<LinearLayout>(R.id.ll_license)
         val llUpdateAdapter = findViewById<LinearLayout>(R.id.ll_update_adapter)
@@ -26,6 +27,10 @@ class AboutActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener {
             finish()
+        }
+
+        llOfficialWebsite.setOnClickListener {
+            openUrl("https://yngu196.github.io/Schedule/")
         }
 
         llGithub.setOnClickListener {

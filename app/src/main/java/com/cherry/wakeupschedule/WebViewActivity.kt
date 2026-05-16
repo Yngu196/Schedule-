@@ -45,7 +45,7 @@ class WebViewActivity : AppCompatActivity() {
         // 常见教务系统域名（不含子域名匹配）
         "jw", "jwc", "jwxt", "edu", "edu.cn", "educom", "jiaowu",
         // 蓝奏云
-        "lanzou", "lanzoui", "lanzoux", "lanzouo"
+        "lanzou", "lanzoui", "lanzoux", "lanzouo", "lanzn", "woozooo"
     )
 
     // 下载监听
@@ -201,10 +201,30 @@ class WebViewActivity : AppCompatActivity() {
                     }
                 }
 
+                private fun isLanZouUrl(url: String): Boolean {
+                    return try {
+                        val host = Uri.parse(url).host ?: return false
+                        allowedDomains.any { domain -> 
+                            domain.contains("lanzou") || domain.contains("lanzn") || 
+                            domain.contains("woozooo") || host.contains("lanzou", ignoreCase = true) || 
+                            host.contains("lanzn", ignoreCase = true) || 
+                            host.contains("woozooo", ignoreCase = true)
+                        }
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+
                 @Deprecated("Deprecated in Java")
                 @SuppressLint("Deprecated")
                 override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                     url?.let {
+                        // 蓝奏云的所有链接都在 WebView 内部处理，包括文件名点击跳转
+                        if (isLanZouUrl(it)) {
+                            Log.d("WebViewActivity", "蓝奏云链接，在 WebView 内部加载: $it")
+                            return false
+                        }
+
                         if (!isUrlAllowed(it)) {
                             Log.w("WebViewActivity", "拦截外部域名跳转: $it")
                             try {

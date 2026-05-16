@@ -852,8 +852,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exportBackup() {
-        // 导出课程备份
-        val courses = viewModel.courses.value
+        // 导出课程备份 - 注意：必须获取所有课程，而不是被筛选过的课程！
+        val courses = CourseDataManager.getInstance(this).getAllCourses()
         if (courses.isNullOrEmpty()) {
             Toast.makeText(this, "没有课程可导出", Toast.LENGTH_SHORT).show()
             return
@@ -980,7 +980,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exportIcs() {
-        val courses = viewModel.courses.value
+        val courses = CourseDataManager.getInstance(this).getAllCourses()
         if (courses.isNullOrEmpty()) {
             Toast.makeText(this, "没有课程可导出", Toast.LENGTH_SHORT).show()
             return
@@ -1794,20 +1794,48 @@ class MainActivity : AppCompatActivity() {
             val gson = Gson()
             val backupData = gson.fromJson(json, BackupData::class.java)
             
-            // 导入课程
+            // 检查是否有现有课程
+            val hasExistingCourses = CourseDataManager.getInstance(this).getAllCourses().isNotEmpty()
+            
             if (backupData.courses.isNotEmpty()) {
-                viewModel.addCourses(backupData.courses)
-                Toast.makeText(this, "成功导入 ${backupData.courses.size} 门课程", Toast.LENGTH_LONG).show()
+                if (hasExistingCourses) {
+                    // 有现有课程，询问用户
+                    AlertDialog.Builder(this)
+                        .setTitle("导入选项")
+                        .setMessage("检测到现有课程。您想要：\n\n1. 保留现有课程并追加新课程\n2. 清空现有课程后导入")
+                        .setPositiveButton("追加导入") { _, _ ->
+                            doImportCourses(backupData, append = true)
+                        }
+                        .setNegativeButton("清空导入") { _, _ ->
+                            doImportCourses(backupData, append = false)
+                        }
+                        .setNeutralButton("取消", null)
+                        .show()
+                } else {
+                    // 没有现有课程，直接导入
+                    doImportCourses(backupData, append = false)
+                }
+            } else {
+                // 没有课程数据，直接询问配置
+                showImportSettingsDialog(backupData.settings, backupData.timeSlots, backupData.maxNodes)
             }
-            
-            // 询问是否导入配置和时间表
-            showImportSettingsDialog(backupData.settings, backupData.timeSlots, backupData.maxNodes)
-            
-            // 更新小组件
-            updateWidget()
         } catch (e: Exception) {
             Toast.makeText(this, "解析备份失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+    
+    private fun doImportCourses(backupData: BackupData, append: Boolean) {
+        if (!append) {
+            viewModel.clearAllCourses()
+        }
+        viewModel.addCourses(backupData.courses)
+        Toast.makeText(this, "成功导入 ${backupData.courses.size} 门课程", Toast.LENGTH_LONG).show()
+        
+        // 询问是否导入配置和时间表
+        showImportSettingsDialog(backupData.settings, backupData.timeSlots, backupData.maxNodes)
+        
+        // 更新小组件
+        updateWidget()
     }
 
     private fun showImportSettingsDialog(
